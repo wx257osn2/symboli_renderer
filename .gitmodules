@@ -1,0 +1,9 @@
+[submodule ".dependencies/nlohmann_json"]
+	path = .dependencies/nlohmann_json
+	url = https://github.com/nlohmann/json
+[submodule ".dependencies/symboli_prelude"]
+	path = .dependencies/symboli_prelude
+	url = https://github.com/wx257osn2/symboli_prelude
+[submodule ".dependencies/will/include/will"]
+	path = .dependencies/will/include/will
+	url = https://github.com/wx257osn2/will
