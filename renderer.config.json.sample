@@ -1,0 +1,15 @@
+{
+    "aspect_ratio": {
+        "width": 4,
+        "height": 3
+    },
+    "max_fps": 50,
+    "rendering_resolution": {
+        "width": 1440,
+        "height": 1080,
+        "ui_scale": 1
+    },
+    "auto_full_screen": true,
+    "adjust_window_size": true,
+    "lock_window_size": true
+}
