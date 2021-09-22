@@ -151,7 +151,7 @@ struct gallop_get_height : symboli::hook_func<int(), gallop_get_height>{
 
 struct set_reference_resolution : symboli::hook_func<void(void*, symboli::il2cpp::data_type::UnityEngine::Vector2), set_reference_resolution>{
 	static void func(void* self, symboli::il2cpp::data_type::UnityEngine::Vector2 res){
-		if (config.rendering_resolution.enabled)
+		if(config.rendering_resolution.enabled)
 			if(config.rendering_resolution.ui_scale > 0.f)
 				set_scale_factor(self, std::max(1.f, static_cast<float>(std::max(gallop_get_width::func(), gallop_get_height::func()))/1920.f) * config.rendering_resolution.ui_scale);
 		if(config.auto_full_screen){
@@ -184,9 +184,9 @@ struct wndproc : symboli::hook_func<LRESULT(HWND, UINT, WPARAM, LPARAM), wndproc
 
 		const auto new_ratio = width / height;
 
-		if (new_ratio > ratio && (height >= last_height || width < last_width))
+		if(new_ratio > ratio && height >= last_height || width < last_width)
 			height = width / ratio;
-		else if (new_ratio < ratio && (width >= last_width || height < last_height))
+		else if(new_ratio < ratio && width >= last_width || height < last_height)
 			width = height * ratio;
 
 		RECT win_rect;
@@ -208,9 +208,8 @@ struct wndproc : symboli::hook_func<LRESULT(HWND, UINT, WPARAM, LPARAM), wndproc
 		}
 		else if(msg == WM_STYLECHANGING && wparam == GWL_STYLE && config.lock_window_size)
 			reinterpret_cast<STYLESTRUCT*>(lparam)->styleNew &= ~WS_THICKFRAME;
-		else if(msg == WM_SIZE && wparam == 0){
+		else if(msg == WM_SIZE && wparam == 0)
 			change_window_size(hwnd, LOWORD(lparam), HIWORD(lparam));
-		}
 		return orig(hwnd, msg, wparam, lparam);
 	}
 };
