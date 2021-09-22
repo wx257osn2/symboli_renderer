@@ -90,38 +90,22 @@ static bool (*get_full_screen)();
 static int (*get_width)();
 static int (*get_height)();
 static void (*set_scale_factor)(void*, float);
-static void adjust_window_size(float, float);
 
 struct set_resolution : symboli::hook_func<void(int, int, bool), set_resolution>{
 	static void func(int width, int height, bool full_screen){
-		if(config.auto_full_screen || config.adjust_window_size){
+		if(config.auto_full_screen){
 			symboli::il2cpp::data_type::Resolution res;
 			res = *get_current_resolution(&res);
 			const bool display_virt = res.height > res.width;
 			const bool window_virt = height > width;
-			if(display_virt == window_virt && config.auto_full_screen){
+			if(display_virt == window_virt){
 				orig(res.width, res.height, true);
 				return;
 			}
-			if(config.adjust_window_size){
-				adjust_window_size(window_virt ? config.aspect_ratio.width : config.aspect_ratio.height, window_virt ? config.aspect_ratio.height : config.aspect_ratio.width);
-				return;
-			}
 		}
-		if(width < height)
-			width = static_cast<int>(height*config.aspect_ratio.height/config.aspect_ratio.width);
-		else
-			width = static_cast<int>(height*config.aspect_ratio.width/config.aspect_ratio.height);
 		orig(width, height, full_screen);
 	}
 };
-
-static inline void adjust_window_size(float aspect_ratio_width, float aspect_ratio_height){
-	symboli::il2cpp::data_type::Resolution res;
-	get_current_resolution(&res);
-	auto height = res.height - 100;
-	set_resolution::orig(static_cast<int>(height * aspect_ratio_height / aspect_ratio_width), height, false);
-}
 
 struct get_optimized_window_size_virt : symboli::hook_func<symboli::il2cpp::data_type::UnityEngine::Vector3*(symboli::il2cpp::data_type::UnityEngine::Vector3*, int, int), get_optimized_window_size_virt>{
 	static symboli::il2cpp::data_type::UnityEngine::Vector3* func(symboli::il2cpp::data_type::UnityEngine::Vector3* vec, int width, int height){
@@ -216,7 +200,7 @@ struct wndproc : symboli::hook_func<LRESULT(HWND, UINT, WPARAM, LPARAM), wndproc
 	}
 	static LRESULT func(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
 		static bool at_first = true;
-		if(at_first){
+		if(at_first && msg == WM_STYLECHANGED){
 			at_first = false;
 			RECT rect;
 			::GetClientRect(hwnd, &rect);
@@ -353,7 +337,10 @@ static inline BOOL process_attach(HINSTANCE hinst){
 
 		if(config.adjust_window_size){
 			(il2cpp->*attached_thread([]{
-				adjust_window_size(config.aspect_ratio.width, config.aspect_ratio.height);
+				symboli::il2cpp::data_type::Resolution res;
+				get_current_resolution(&res);
+				auto height = res.height - 100;
+				set_resolution::orig(static_cast<int>(height * config.aspect_ratio.height / config.aspect_ratio.width), height, false);
 			})).detach();
 		}
 	});
