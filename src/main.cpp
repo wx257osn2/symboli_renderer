@@ -9,36 +9,21 @@
 static std::optional<symboli::prelude> prelude;
 
 struct config_t{
-	int max_fps;
+	int max_fps = -1;
 	struct{
-		float width;
-		float height;
+		float width = 16.f;
+		float height = 9.f;
 	}aspect_ratio;
 	struct{
-		bool enabled;
-		float width;
-		float height;
-		float ui_scale;
+		bool enabled = false;
+		float width = 1920.f;
+		float height = 1080.f;
+		float ui_scale = -1.f;
 	}rendering_resolution;
-	bool auto_full_screen;
-	bool adjust_window_size;
-	bool lock_window_size;
-}static config = {
-	.max_fps = -1,
-	.aspect_ratio = {
-		.width = 16.f,
-		.height = 9.f
-	},
-	.rendering_resolution = {
-		.enabled = false,
-		.width = 1920.f,
-		.height = 1080.f,
-		.ui_scale = -1.f
-	},
-	.auto_full_screen = false,
-	.adjust_window_size = false,
-	.lock_window_size = false
-};
+	bool auto_full_screen = false;
+	bool adjust_window_size = false;
+	bool lock_window_size = false;
+}static config;
 static inline void from_json(const nlohmann::json& j, config_t& conf){
 	auto config_opt_read = [](const nlohmann::json& j, const nlohmann::json::object_t::key_type& key, auto& value){
 		prelude->config_read<true>("Symboli Renderer :: config_read", j, key, value);
