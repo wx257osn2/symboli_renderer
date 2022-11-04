@@ -78,8 +78,8 @@ static inline void from_json(const nlohmann::json& j, config_t& conf){
 	config_opt_read(j, "lock_window_size", conf.lock_window_size);
 }
 
-struct set_target_framerate : symboli::hook_func<void(int), set_target_framerate>{
-	static void func(int){
+struct set_target_framerate : symboli::hook_func<void(std::int32_t), set_target_framerate>{
+	static void func(std::int32_t){
 		orig(config.max_fps);
 	}
 };
@@ -247,11 +247,8 @@ static inline BOOL process_attach(HINSTANCE hinst){
 		using symboli::il2cpp::data_type::Resolution;
 
 		if(config.max_fps > 0){
-			const auto set_targetFrameRate = il2cpp->*get_method<void(int)>(
-				"UnityEngine.CoreModule.dll",
-				"UnityEngine",
-				"Application",
-				"set_targetFrameRate");
+			const auto set_targetFrameRate = il2cpp.resolve_icall<void(std::int32_t)>(
+				"UnityEngine.Application::set_targetFrameRate(System.Int32)");
 			prelude->hook<set_target_framerate>(set_targetFrameRate).value();
 		}
 
