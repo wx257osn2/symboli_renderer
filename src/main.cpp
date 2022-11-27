@@ -90,6 +90,7 @@ static bool (*get_full_screen)();
 static int (*get_width)();
 static int (*get_height)();
 static void (*set_scale_factor)(void*, float);
+static symboli::il2cpp::IEnumerable* (*ui_manager_get_canvas_scaler_list)(void*);
 
 struct set_resolution : symboli::hook_func<void(int, int, bool), set_resolution>{
 	static void func(int width, int height, bool full_screen){
@@ -149,11 +150,15 @@ struct gallop_get_height : symboli::hook_func<int(), gallop_get_height>{
 	}
 };
 
+static inline void set_scale_factor_with_ui_scale(void* x){
+	set_scale_factor(x, std::max(1.f, static_cast<float>(std::max(gallop_get_width::func(), gallop_get_height::func()))/1920.f) * config.rendering_resolution.ui_scale);
+}
+
 struct set_reference_resolution : symboli::hook_func<void(void*, symboli::il2cpp::data_type::UnityEngine::Vector2), set_reference_resolution>{
 	static void func(void* self, symboli::il2cpp::data_type::UnityEngine::Vector2 res){
 		if(config.rendering_resolution.enabled)
 			if(config.rendering_resolution.ui_scale > 0.f)
-				set_scale_factor(self, std::max(1.f, static_cast<float>(std::max(gallop_get_width::func(), gallop_get_height::func()))/1920.f) * config.rendering_resolution.ui_scale);
+				set_scale_factor_with_ui_scale(self);
 		if(config.auto_full_screen){
 			symboli::il2cpp::data_type::Resolution r;
 			r = *get_current_resolution(&r);
@@ -171,6 +176,20 @@ struct set_reference_resolution : symboli::hook_func<void(void*, symboli::il2cpp
 				res.x = res.y*config.aspect_ratio.width/config.aspect_ratio.height;
 		}
 		orig(self, res);
+	}
+};
+
+struct change_resize_ui_for_pc : symboli::hook_func<void(void*, int, int), change_resize_ui_for_pc>{
+	static void func(void* self, int width, int height){
+		symboli::il2cpp::data_type::Resolution r;
+		r = *get_current_resolution(&r);
+		orig(self, width, height);
+
+		const auto canvas_scaler_list = ui_manager_get_canvas_scaler_list(self);
+		auto il2cpp =+ symboli::il2cpp::module::create(_T("GameAssembly.dll"));
+		using symboli::il2cpp::iterate;
+		for(auto&& canvas_scaler : il2cpp->*iterate(canvas_scaler_list))
+			set_scale_factor_with_ui_scale(canvas_scaler);
 	}
 };
 
@@ -273,6 +292,19 @@ static inline BOOL process_attach(HINSTANCE hinst){
 				"CanvasScaler",
 				"set_scaleFactor",
 				1);
+			ui_manager_get_canvas_scaler_list = il2cpp->*get_method<symboli::il2cpp::IEnumerable*(void*)>(
+				"umamusume.dll",
+				"Gallop",
+				"UIManager",
+				"GetCanvasScalerList",
+				-1);
+			const auto ChangeResizeUIForPC = il2cpp->*get_method<void(void*, int, int)>(
+				"umamusume.dll",
+				"Gallop",
+				"UIManager",
+				"ChangeResizeUIForPC",
+				2);
+			prelude->hook<change_resize_ui_for_pc>(ChangeResizeUIForPC).value();
 		}
 
 		if(config.auto_full_screen){
@@ -283,7 +315,7 @@ static inline BOOL process_attach(HINSTANCE hinst){
 				"get_fullScreen");
 		}
 
-		if(config.auto_full_screen || config.adjust_window_size){
+		if(config.auto_full_screen || config.adjust_window_size || config.rendering_resolution.enabled){
 			get_current_resolution = il2cpp->*get_method<Resolution*(Resolution*)>(
 				"UnityEngine.CoreModule.dll",
 				"UnityEngine",
