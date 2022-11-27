@@ -9,6 +9,12 @@
 static std::optional<symboli::prelude> prelude;
 
 struct config_t{
+	enum class msaa{
+		auto_,
+		disable,
+		enable
+	};
+
 	int max_fps = -1;
 	struct{
 		float width = 16.f;
@@ -23,6 +29,12 @@ struct config_t{
 	bool auto_full_screen = false;
 	bool adjust_window_size = false;
 	bool lock_window_size = false;
+	struct{
+		int unity_global = -1;
+		int unity_render_texture = -1;
+		msaa allow_msaa = msaa::auto_;
+	}antialiasing;
+	int graphics_quality = -1;
 }static config;
 static inline void from_json(const nlohmann::json& j, config_t& conf){
 	auto config_opt_read = [](const nlohmann::json& j, const nlohmann::json::object_t::key_type& key, auto& value){
@@ -76,6 +88,47 @@ static inline void from_json(const nlohmann::json& j, config_t& conf){
 	config_opt_read(j, "auto_full_screen", conf.auto_full_screen);
 	config_opt_read(j, "adjust_window_size", conf.adjust_window_size);
 	config_opt_read(j, "lock_window_size", conf.lock_window_size);
+	if(j.contains("antialiasing") && j["antialiasing"].is_object()){
+		auto&& antialiasing = j["antialiasing"];
+		auto f = [&antialiasing](std::string name){
+			if(!antialiasing.contains(name))
+				return -1;
+			if(!antialiasing.at(name).is_number_integer()){
+				prelude->diagnostic("Symboli Renderer :: config_read", ("antialiasing." + name + " must be -1, 2, 4, or 8 (means disabled, 2x, 4x, or 8x multi sampling)").c_str());
+				return -1;
+			}
+			int x;
+			antialiasing.at(name).get_to(x);
+			switch(x){
+			case -1: [[fallthrough]];
+			case 2: [[fallthrough]];
+			case 4: [[fallthrough]];
+			case 8: return x;
+			default:
+				prelude->diagnostic("Symboli Renderer :: config_read", ("antialiasing." + name + " must be -1, 2, 4, or 8 (means disabled, 2x, 4x, or 8x multi sampling)").c_str());
+				return -1;
+			}
+		};
+		conf.antialiasing.unity_global = f("unity_global");
+		conf.antialiasing.unity_render_texture = f("unity_render_texture");
+		if(antialiasing.contains("allow_msaa")){
+			if(!antialiasing["allow_msaa"].is_string())
+				prelude->diagnostic("Symboli Renderer :: config_read", R"(antialiasing.allow_msaa must be "auto", "disable", or "enable")");
+			else{
+				std::string x;
+				antialiasing.at("allow_msaa").get_to(x);
+				if(x == "auto")
+					conf.antialiasing.allow_msaa = config_t::msaa::auto_;
+				else if(x == "disable")
+					conf.antialiasing.allow_msaa = config_t::msaa::disable;
+				else if(x == "enable")
+					conf.antialiasing.allow_msaa = config_t::msaa::enable;
+				else
+					prelude->diagnostic("Symboli Renderer :: config_read", R"(antialiasing.allow_msaa must be "auto", "disable", or "enable")");
+			}
+		}
+	}
+	config_opt_read(j, "graphics_quality", conf.graphics_quality);
 }
 
 struct set_target_framerate : symboli::hook_func<void(std::int32_t), set_target_framerate>{
@@ -91,6 +144,30 @@ static int (*get_width)();
 static int (*get_height)();
 static void (*set_scale_factor)(void*, float);
 static symboli::il2cpp::IEnumerable* (*ui_manager_get_canvas_scaler_list)(void*);
+
+struct set_antialiasing : symboli::hook_func<void(int), set_antialiasing>{
+	static void func(int){
+		orig(config.antialiasing.unity_global);
+	}
+};
+
+struct set_render_texture_antialiasing : symboli::hook_func<void(void*, int), set_render_texture_antialiasing>{
+	static void func(void* self, int){
+		orig(self, config.antialiasing.unity_render_texture);
+	}
+};
+
+struct get_3d_antialiasing_level : symboli::hook_func<int(void*, bool), get_3d_antialiasing_level>{
+	static int func(void* self, bool){
+		return orig(self, config.antialiasing.allow_msaa == config_t::msaa::enable);
+	}
+};
+
+struct apply_graphics_quality : symboli::hook_func<void(symboli::il2cpp::data_type::Il2CppObject*, int, bool), apply_graphics_quality>{
+	static void func(symboli::il2cpp::data_type::Il2CppObject* self, int, bool){
+		orig(self, config.graphics_quality, true);
+	}
+};
 
 struct set_resolution : symboli::hook_func<void(int, int, bool), set_resolution>{
 	static void func(int width, int height, bool full_screen){
@@ -252,7 +329,13 @@ static inline BOOL process_attach(HINSTANCE hinst){
 			std::cout << "disabled\n";
 		std::cout << "  auto_full_screen: " << config.auto_full_screen << "\n"
 		             "  adjust_window_size: " << config.adjust_window_size << "\n"
-		             "  lock_window_size: " << config.lock_window_size << std::endl;
+		             "  lock_window_size: " << config.lock_window_size << "\n"
+		             "  antialiasing: { .unity_global: " << config.antialiasing.unity_global << "\n"
+		             "                  .unity_render_texture: " << config.antialiasing.unity_render_texture << "\n"
+		             "                  .allow_msaa" << (config.antialiasing.allow_msaa == config_t::msaa::auto_ ? "auto" :
+		                                                 config.antialiasing.allow_msaa == config_t::msaa::enable ? "enable" :
+		                                                                                                            "disable") << " } \n"
+		             "  graphics_quality: " << config.graphics_quality << std::endl;
 	}catch(std::exception& e){
 		::MessageBoxA(nullptr, e.what(), "Symboli Renderer exception", MB_OK|MB_ICONWARNING|MB_SETFOREGROUND);
 	}
@@ -370,6 +453,38 @@ static inline BOOL process_attach(HINSTANCE hinst){
 				auto height = res.height - 100;
 				set_resolution::orig(static_cast<int>(height * config.aspect_ratio.height / config.aspect_ratio.width), height, false);
 			})).detach();
+		}
+
+		if(config.antialiasing.unity_global != -1){
+			const auto set_antiAliasing = il2cpp.resolve_icall<void(int)>("UnityEngine.QualitySettings::set_antiAliasing(System.Int32)");
+			prelude->hook<set_antialiasing>(set_antiAliasing).value();
+		}
+		if(config.antialiasing.unity_render_texture != -1){
+			const auto set_antiAliasing = il2cpp->*get_method<void(void*, int)>(
+				"UnityEngine.CoreModule.dll",
+				"UnityEngine",
+				"RenderTexture",
+				"set_antiAliasing",
+				1);
+			prelude->hook<set_render_texture_antialiasing>(set_antiAliasing).value();
+		}
+		if(config.antialiasing.allow_msaa != config_t::msaa::auto_){
+			const auto Get3DAntiAliasingLevel = il2cpp->*get_method<int(void*, bool)>(
+				"umamusume.dll",
+				"Gallop",
+				"GraphicSettings",
+				"Get3DAntiAliasingLevel",
+				1);
+			prelude->hook<get_3d_antialiasing_level>(Get3DAntiAliasingLevel).value();
+		}
+		if(config.graphics_quality != -1){
+			const auto ApplyGraphicsQuality = il2cpp->*get_method<void(symboli::il2cpp::Il2CppObject*, int, bool)>(
+				"umamusume.dll",
+				"Gallop",
+				"GraphicSettings",
+				"ApplyGraphicsQuality",
+				2);
+			prelude->hook<apply_graphics_quality>(ApplyGraphicsQuality).value();
 		}
 	});
 	return TRUE;

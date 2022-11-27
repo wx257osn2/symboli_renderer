@@ -11,5 +11,11 @@
     },
     "auto_full_screen": true,
     "adjust_window_size": true,
-    "lock_window_size": true
+    "lock_window_size": true,
+    "antialiasing" : {
+        "unity_global": 8,
+        "unity_render_texture": 8,
+        "allow_msaa": "enable"
+    },
+    "graphics_quality": 3
 }
