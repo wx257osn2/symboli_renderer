@@ -332,8 +332,8 @@ static inline BOOL process_attach(HINSTANCE hinst){
 		             "  lock_window_size: " << config.lock_window_size << "\n"
 		             "  antialiasing: { .unity_global: " << config.antialiasing.unity_global << "\n"
 		             "                  .unity_render_texture: " << config.antialiasing.unity_render_texture << "\n"
-		             "                  .allow_msaa" << (config.antialiasing.allow_msaa == config_t::msaa::auto_ ? "auto" :
-		                                                 config.antialiasing.allow_msaa == config_t::msaa::enable ? "enable" :
+		             "                  .allow_msaa: " << (config.antialiasing.allow_msaa == config_t::msaa::auto_ ? "auto" :
+		                                                   config.antialiasing.allow_msaa == config_t::msaa::enable ? "enable" :
 		                                                                                                            "disable") << " } \n"
 		             "  graphics_quality: " << config.graphics_quality << std::endl;
 	}catch(std::exception& e){
